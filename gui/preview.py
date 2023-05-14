@@ -1,11 +1,8 @@
 import os
 import re
-import sys
-from functools import partial
 from PyQt5.QtCore import Qt, QObject, pyqtSignal
-from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QSpacerItem, QComboBox, QSizePolicy, QWidget, QPushButton, QGridLayout, QStackedWidget, QFileDialog, QCheckBox, QLineEdit
+from PyQt5.QtWidgets import  QVBoxLayout, QHBoxLayout, QLabel, QSpacerItem, QComboBox, QSizePolicy, QWidget, QPushButton, QGridLayout, QCheckBox, QLineEdit
 from PyQt5.QtGui import QPixmap
-from datetime import datetime
 from glob import glob
 
 class FavouriteLinkWidgetSignal(QObject):

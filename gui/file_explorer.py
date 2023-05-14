@@ -1,9 +1,7 @@
 import os
-import sys
 import string
-from functools import partial
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, QFile, QIODevice, QModelIndex
-from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QSpacerItem, QComboBox, QSizePolicy, QWidget, QPushButton, QGridLayout, QStackedWidget, QFileDialog, QCheckBox, QLineEdit, QTreeView, QFileSystemModel, QHeaderView
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QModelIndex
+from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSpacerItem, QComboBox, QSizePolicy, QWidget, QPushButton, QGridLayout, QLineEdit, QTreeView, QFileSystemModel, QHeaderView
 
 class WhereToLookControlWidgetSignal(QObject):
     signal_where_to_look = pyqtSignal(str)

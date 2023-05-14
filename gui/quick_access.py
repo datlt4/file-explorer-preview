@@ -47,7 +47,8 @@ class QuickAccessItem(QListWidgetItem):
         self.item.setSizeHint(self.widget.sizeHint())
         # Create a right-click menu with a remove action
         self.menu = QMenu(self.listWidget)
-        self.menu.setStyleSheet("""QMenu { background-color: transparent; color = #D6D6D6}
+        self.menu.setStyleSheet("""
+                                QMenu::item:unselected { background-color: white; color: #404040; }
                                 QMenu::item:selected { background-color: #99FDC3; color: #075e6f; }
                                 QMenu::item:selected:!active { background-color: #99FDC3; color: #075e6f; }
                                 """)
@@ -74,8 +75,6 @@ class QuickAccessItem(QListWidgetItem):
     def onRemoveAction(self):
         # row = self.listWidget.row(self.widgetItem)
         # self.listWidget.takeItem(row)
-        self.menu.hide()
-        # self.menu.close()
         print("self.menu.close()")
         self.signals.signal_remove_quickaccess.emit([self.idx, self.address])
 
