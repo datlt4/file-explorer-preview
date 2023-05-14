@@ -39,7 +39,6 @@ class AppWindow(QMainWindow):
         self.initSignalConnection()
         self.closeEvent = self._closeEvent
         self.onClickedFile(os.getcwd().replace("\\", "/"))
-        
     
     def initUI(self):
         self.setWindowTitle(self.title)
