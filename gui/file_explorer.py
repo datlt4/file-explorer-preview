@@ -1,13 +1,14 @@
 import os
 import sys
+import string
 from functools import partial
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QFile, QIODevice, QModelIndex
 from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QSpacerItem, QComboBox, QSizePolicy, QWidget, QPushButton, QGridLayout, QStackedWidget, QFileDialog, QCheckBox, QLineEdit, QTreeView, QFileSystemModel, QHeaderView
-from PyQt5.QtGui import QPixmap
 
 class WhereToLookControlWidgetSignal(QObject):
     signal_where_to_look = pyqtSignal(str)
     signal_add_quick_access = pyqtSignal(str)
+    signal_back = pyqtSignal(str)
 
 class WhereToLookControlWidget(QWidget):
     def __init__(self, whereToLookControlWidget, font):
@@ -33,13 +34,14 @@ class WhereToLookControlWidget(QWidget):
         self.sizePolicy.setHeightForWidth(self.whereToLookComboBox.sizePolicy().hasHeightForWidth())
         self.whereToLookControlLayout.addWidget(self.whereToLookComboBox, 0)
         # # 1
-        # self.previousDirectoryButton = QPushButton(self.whereToLookControlWidget)
-        # self.previousDirectoryButton.setText("←")
-        # self.previousDirectoryButton.setFont(self.font.fonts["14"])
-        # self.previousDirectoryButton.setStyleSheet("""QPushButton{ background-color: #068170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
-        #                                             QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
-        #                                             QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }""")
-        # self.whereToLookControlLayout.addWidget(self.previousDirectoryButton, 1)
+        self.previousDirectoryButton = QPushButton(self.whereToLookControlWidget)
+        self.previousDirectoryButton.setText("Back") # ("←")
+        self.previousDirectoryButton.setFont(self.font.fonts["14"])
+        self.previousDirectoryButton.setStyleSheet("""QPushButton{ background-color: #068170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
+                                                    QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
+                                                    QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }""")
+        self.previousDirectoryButton.clicked.connect(self.onBack)
+        self.whereToLookControlLayout.addWidget(self.previousDirectoryButton, 1)
         # 2
         self.addQuickAccessButton = QPushButton(self.whereToLookControlWidget)
         self.addQuickAccessButton.setText("Add to QuickAccess")
@@ -54,7 +56,7 @@ class WhereToLookControlWidget(QWidget):
         # Stretch
         self.whereToLookControlLayout.setStretch(0, 1)
         self.whereToLookControlLayout.setStretch(1, 0)
-        # self.whereToLookControlLayout.setStretch(2, 10)
+        self.whereToLookControlLayout.setStretch(2, 0)
         # self.whereToLookControlLayout.setStretch(3, 20)
         self.whereToLookControlWidget.setLayout(self.whereToLookControlLayout)
 
@@ -67,12 +69,28 @@ class WhereToLookControlWidget(QWidget):
                 listItemt(whereToLookComboBox, path_)
 
         listItemt(self.whereToLookComboBox, path)
+        for letter in string.ascii_uppercase:
+            if ((path == "") or (letter != path[0])) and (os.path.exists(f"{letter}:/")):
+                self.whereToLookComboBox.addItem(f"{letter}:/")
+        
     
     def onAddQuickAccess(self):
         self.signals.signal_add_quick_access.emit(self.whereToLookComboBox.currentText())
 
     def onWhereToLook(self, text):
         self.signals.signal_where_to_look.emit(text)
+        
+    def onBack(self):
+        path = self.whereToLookComboBox.currentText()
+        if os.path.isdir(path):
+            _path = os.path.dirname(path)
+        elif os.path.isfile(path):
+            _path = os.path.dirname(os.path.dirname(path))
+        else:
+            _path = os.getcwd().replace("\\", "/")
+
+        self.signals.signal_back.emit(os.getcwd().replace("\\", "/") if _path=="/" else _path)
+        
 
 class NameTypeFilterWidgetSignal(QObject):
     signal_type_filter = pyqtSignal(str)
@@ -188,15 +206,21 @@ class TreeViewFileSystemWidget(QWidget):
         self.font = font
         self.signals = TreeViewFileSystemWidgetSignal()
         #
-        self.setWindowTitle("File Dialog Preview Example")
         self.treeView = QTreeView(self.treeViewFileSystemWidget)
         self.model = QFileSystemModel()
-        self.model.setRootPath("/")
         self.treeView.setModel(self.model)
         header = self.treeView.header()
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
         self.treeView.clicked.connect(self.onTreeViewClicked)
         self.treeView.doubleClicked.connect(self.onTreeViewClicked)
+        self.treeView.setExpandsOnDoubleClick(True) # Hide ">" button
+        self.treeView.setRootIsDecorated(False)
+        self.treeView.setIndentation(10)
+        self.treeView.setAutoExpandDelay(-1)
+        self.treeView.setAnimated(False)
+        self.treeView.setUniformRowHeights(True)
+        self.treeView.setSortingEnabled(True)
+        self.setRootPath(os.getcwd().replace("\\", "/"))
         self.treeViewFileSystemLayout.addWidget(self.treeView, 0, 0, 1, 1)
         # Stretch
         self.treeViewFileSystemLayout.setRowStretch(0, 1)
@@ -208,3 +232,18 @@ class TreeViewFileSystemWidget(QWidget):
         # if os.path.isfile(path):
         if True:
             self.signals.signal_send_clicked_path.emit(path)
+
+    def setRootPath(self, path):
+        if os.path.isfile(path):
+            path = os.path.dirname(path)
+
+        self.model.setRootPath(path)
+        self.treeView.setModel(self.model)
+        self.treeView.setRootIndex(self.model.index(path))
+        # Collapse all expanded items
+        self.treeView.collapseAll()
+
+    def getCurrentIndex(self):
+        current_index = self.treeView.currentIndex()
+        current_path = self.model.filePath(current_index)
+        return current_path

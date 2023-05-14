@@ -38,6 +38,8 @@ class AppWindow(QMainWindow):
         self.initUI()
         self.initSignalConnection()
         self.closeEvent = self._closeEvent
+        self.onClickedFile(os.getcwd().replace("\\", "/"))
+        
     
     def initUI(self):
         self.setWindowTitle(self.title)
@@ -132,6 +134,7 @@ class AppWindow(QMainWindow):
         self.quickAccessWidget.signals.signal_send_quickaccess_address.connect(lambda path: self.onSendCurrentImage(path))
         self.quickAccessWidget.signals.signal_remove_quickaccess.connect(lambda item: self.onRemoveQuickAccess(item))
         self.whereToLookControlWidget.signals.signal_add_quick_access.connect(self.onAddNewQuickAccess)
+        self.whereToLookControlWidget.signals.signal_back.connect(lambda path: self.onClickedFile(path))
 
     def onClickedFile(self, path):
         if os.path.exists(path):
@@ -139,19 +142,21 @@ class AppWindow(QMainWindow):
             self.nameTypeFilterWidget.signals.signal_set_name_line_edit.emit(self.selectedFile)
             self.whereToLookControlWidget.reloadWhereToLookCombobox(self.selectedFile)
             self.visualPreviewWidget.updateListFiles(self.selectedFile)
+            self.listAllFileDirWidget.setRootPath(path)
 
     def onUpdateExtensionFilter(self, filter):
         self.visualPreviewWidget.updateListFiles(self.selectedFile, filter)
 
     def onSendCurrentImage(self, path):
         if path != "":
-            file_index = self.listAllFileDirWidget.model.index(path)
-            self.listAllFileDirWidget.treeView.setCurrentIndex(file_index)
-            self.selectedFile = path
-            self.nameTypeFilterWidget.signals.signal_set_name_line_edit.emit(self.selectedFile)
-            self.whereToLookControlWidget.reloadWhereToLookCombobox(self.selectedFile)
             if os.path.isdir(self.selectedFile):
-                self.visualPreviewWidget.updateListFiles(self.selectedFile)
+                self.onClickedFile(path)
+            else:
+                self.selectedFile = path
+                self.nameTypeFilterWidget.signals.signal_set_name_line_edit.emit(self.selectedFile)
+                self.whereToLookControlWidget.reloadWhereToLookCombobox(self.selectedFile)
+                self.listAllFileDirWidget.setRootPath(path)
+            
 
     def onAddNewQuickAccess(self, text):
         path = text if (os.path.isdir(text)) else os.path.dirname(text)
