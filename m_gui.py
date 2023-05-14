@@ -130,6 +130,7 @@ class AppWindow(QMainWindow):
         self.whereToLookControlWidget.signals.signal_where_to_look.connect(lambda path: self.onSendCurrentImage(path))
         self.nameTypeFilterWidget.signals.signal_send_open_path.connect(lambda path: self.onSendCurrentImage(path))
         self.quickAccessWidget.signals.signal_send_quickaccess_address.connect(lambda path: self.onSendCurrentImage(path))
+        self.quickAccessWidget.signals.signal_remove_quickaccess.connect(lambda item: self.onRemoveQuickAccess(item))
         self.whereToLookControlWidget.signals.signal_add_quick_access.connect(self.onAddNewQuickAccess)
 
     def onClickedFile(self, path):
@@ -155,6 +156,15 @@ class AppWindow(QMainWindow):
     def onAddNewQuickAccess(self, text):
         path = text if (os.path.isdir(text)) else os.path.dirname(text)
         self.quickAccessAddresses.append(path)
+        m_db.write_db(self.quickAccessAddresses)
+        self.quickAccessWidget.reload(self.quickAccessAddresses)
+        
+    def onRemoveQuickAccess(self, item):
+        idx, address = item
+        if (idx >= 0) and (idx < len(self.quickAccessAddresses)):
+            if self.quickAccessAddresses[idx] == address:
+                self.quickAccessAddresses.pop(idx)
+
         m_db.write_db(self.quickAccessAddresses)
         self.quickAccessWidget.reload(self.quickAccessAddresses)
 

@@ -1,14 +1,16 @@
 import os
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QSize
-from PyQt5.QtWidgets import QLabel, QSizePolicy, QWidget, QVBoxLayout, QListWidgetItem, QListWidget, QPushButton
-from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtWidgets import QLabel, QSizePolicy, QWidget, QVBoxLayout, QListWidgetItem, QListWidget, QPushButton, QAction, QMenu
+from PyQt5.QtGui import QIcon
 
 class QuickAccessItemSignals(QObject):
     signal_send_quickaccess_address = pyqtSignal(str)
+    signal_remove_quickaccess = pyqtSignal(list)
 
 class QuickAccessItem(QListWidgetItem):
-    def __init__(self, listWidget, font, address, desktop_w, desktop_h):
+    def __init__(self, listWidget, font, address, desktop_w, desktop_h, idx):
         super(QuickAccessItem, self).__init__()
+        self.idx = idx
         self.address = address
         self.font = font
         self.desktop_w = desktop_w
@@ -43,6 +45,19 @@ class QuickAccessItem(QListWidgetItem):
         self.widgetLayout.setStretch(0, 1)
         self.widget.setLayout(self.widgetLayout)
         self.item.setSizeHint(self.widget.sizeHint())
+        # Create a right-click menu with a remove action
+        self.menu = QMenu(self.listWidget)
+        self.menu.setStyleSheet("""QMenu { background-color: transparent; color = #D6D6D6}
+                                QMenu::item:selected { background-color: #99FDC3; color: #075e6f; }
+                                QMenu::item:selected:!active { background-color: #99FDC3; color: #075e6f; }
+                                """)
+        self.menu.setFont(self.font.fonts["10"])
+        self.removeAction = QAction("Remove", self.listWidget)
+        self.removeAction.triggered.connect(self.onRemoveAction)
+        self.menu.addAction(self.removeAction)
+        # Connect the context menu event handler function to the customContextMenuRequested signal
+        self.listWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.listWidget.customContextMenuRequested.connect(self.showContextMenu)
 
     def get_address(self):
         return self.address
@@ -56,12 +71,20 @@ class QuickAccessItem(QListWidgetItem):
             self.widgetItem = self.listWidget.item(self.listWidget.count() - 1)
         self.listWidget.setItemWidget(self.item, self.widget)
 
-    def remove(self):
-        row = self.listWidget.row(self.widgetItem)
-        self.listWidget.takeItem(row)
+    def onRemoveAction(self):
+        # row = self.listWidget.row(self.widgetItem)
+        # self.listWidget.takeItem(row)
+        self.menu.hide()
+        # self.menu.close()
+        print("self.menu.close()")
+        self.signals.signal_remove_quickaccess.emit([self.idx, self.address])
+
+    def showContextMenu(self, pos):
+        self.menu.exec_(self.listWidget.mapToGlobal(pos))
 
 class QuickAccessWidgetSignals(QObject):
     signal_send_quickaccess_address = pyqtSignal(str)
+    signal_remove_quickaccess = pyqtSignal(list)
 
 class QuickAccessWidget(QWidget):
     def __init__(self, quickAccessWidget, font, quickAccessAddresses, desktop_w, desktop_h):
@@ -93,18 +116,20 @@ class QuickAccessWidget(QWidget):
         self.quickAccessListItems = []
         self.reload(quickAccessAddresses)
 
-    def addNew(self, address):
-        item = QuickAccessItem(self.quickAccessListWidget, self.font, address, self.desktop_w, self.desktop_h)
+    def addNew(self, address, idx):
+        item = QuickAccessItem(self.quickAccessListWidget, self.font, address, self.desktop_w, self.desktop_h, idx)
         item.signals.signal_send_quickaccess_address.connect(lambda path: self.signals.signal_send_quickaccess_address.emit(path))
+        item.signals.signal_remove_quickaccess.connect(lambda item: self.signals.signal_remove_quickaccess.emit(item))
         item.insert(top=False)
         self.quickAccessListItems.append(item)
 
     def reload(self, quickAccess):
-        for i in range(len(self.quickAccessListItems) - 1, -1 , -1): del(self.quickAccessListItems[i])
+        for i in range(len(self.quickAccessListItems) - 1, -1 , -1):
+            del(self.quickAccessListItems[i])
 
         self.quickAccessListWidget.clear()
         self.quickAccessListItems.clear()
         
-        for address in quickAccess:
-            self.addNew(address)
+        for idx, address in enumerate(quickAccess):
+            self.addNew(address, idx)
 

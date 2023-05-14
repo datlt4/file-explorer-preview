@@ -194,7 +194,7 @@ class TreeViewFileSystemWidget(QWidget):
         self.model.setRootPath("/")
         self.treeView.setModel(self.model)
         header = self.treeView.header()
-        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
         self.treeView.clicked.connect(self.onTreeViewClicked)
         self.treeView.doubleClicked.connect(self.onTreeViewClicked)
         self.treeViewFileSystemLayout.addWidget(self.treeView, 0, 0, 1, 1)
