@@ -1,7 +1,27 @@
 import os
+import re
 import string
+from PyQt5.QtGui import QFocusEvent
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QModelIndex
 from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSpacerItem, QComboBox, QSizePolicy, QWidget, QPushButton, QGridLayout, QLineEdit, QTreeView, QFileSystemModel, QHeaderView
+
+class CustomComboBoxSignal(QObject):
+    signal_where_to_look = pyqtSignal(str)
+
+class CustomComboBox(QComboBox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setEditable(True)
+        self.signals = CustomComboBoxSignal()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            text = self.currentText()
+            if os.path.exists(text):
+                self.signals.signal_where_to_look.emit(text)
+        else:
+            super().keyPressEvent(event)
+
 
 class WhereToLookControlWidgetSignal(QObject):
     signal_where_to_look = pyqtSignal(str)
@@ -22,11 +42,12 @@ class WhereToLookControlWidget(QWidget):
         self.font = font
         self.signals = WhereToLookControlWidgetSignal()
         # 0        
-        self.whereToLookComboBox = QComboBox(self.whereToLookControlWidget)
+        self.whereToLookComboBox = CustomComboBox(self.whereToLookControlWidget)
         self.whereToLookComboBox.setFont(self.font.fonts["12"])
-        self.whereToLookComboBox.setStyleSheet("""QComboBox{ background-color: white; padding-left: 15px }
-                                                QComboBox:QAbstractItemView{ background-color: white; color:orange; padding-left: 15px }""")
+        self.whereToLookComboBox.setStyleSheet("""QComboBox{ background-color: white; padding-left: 15px; font-size: 15px }
+                                                  QComboBox:QAbstractItemView{ background-color: white; color: orange; padding-left: 15px }""")
         self.whereToLookComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.whereToLookComboBox.signals.signal_where_to_look.connect(self.onWhereToLook)
         self.whereToLookComboBox.activated[str].connect(self.onWhereToLook)
         self.reloadWhereToLookCombobox("")
         self.sizePolicy.setHeightForWidth(self.whereToLookComboBox.sizePolicy().hasHeightForWidth())
@@ -35,18 +56,16 @@ class WhereToLookControlWidget(QWidget):
         self.previousDirectoryButton = QPushButton(self.whereToLookControlWidget)
         self.previousDirectoryButton.setText("Back") # ("←")
         self.previousDirectoryButton.setFont(self.font.fonts["14"])
-        self.previousDirectoryButton.setStyleSheet("""QPushButton{ background-color: #068170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
-                                                    QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
-                                                    QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }""")
+        self.previousDirectoryButton.setStyleSheet("""
+                                                   QPushButton{ background-color: #068170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
+                                                   QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
+                                                   QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
+                                                   """)
         self.previousDirectoryButton.clicked.connect(self.onBack)
         self.whereToLookControlLayout.addWidget(self.previousDirectoryButton, 1)
         # 2
         self.addQuickAccessButton = QPushButton(self.whereToLookControlWidget)
-        self.addQuickAccessButton.setText("Add to QuickAccess")
         self.addQuickAccessButton.setFont(self.font.fonts["14"])
-        self.addQuickAccessButton.setStyleSheet("""QPushButton{ background-color: #068170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
-                                                    QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
-                                                    QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }""")
         self.addQuickAccessButton.clicked.connect(self.onAddQuickAccess)
         self.whereToLookControlLayout.addWidget(self.addQuickAccessButton, 1)
         # 3
@@ -57,21 +76,38 @@ class WhereToLookControlWidget(QWidget):
         self.whereToLookControlLayout.setStretch(2, 0)
         # self.whereToLookControlLayout.setStretch(3, 20)
         self.whereToLookControlWidget.setLayout(self.whereToLookControlLayout)
+        
+    def styleAddQuickAccessButton(self, addOrRemove="Add"):
+        if addOrRemove=="Add":
+            self.addQuickAccessButton.setText(" Add to QuickAccess ")
+            self.addQuickAccessButton.setStyleSheet("""
+                                                    QPushButton{ background-color: #068170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
+                                                    QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
+                                                    QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 5; }
+                                                    """)
+        else: # "Remove"
+            self.addQuickAccessButton.setText("Remove from QuickAccess")
+            self.addQuickAccessButton.setFont(self.font.fonts["14"])
+            self.addQuickAccessButton.setStyleSheet("""
+                                                    QPushButton{ background-color: #c5653b; color: #f2ddd3; border: transparent; padding: 5; border-radius: 5; }
+                                                    QPushButton::pressed{ background-color: #be5425; color: #f2ddd3; border: transparent; padding: 5; border-radius: 5; }
+                                                    QPushButton::hover{ background-color: #d28766; color: #f2ddd3; border: transparent; padding: 5; border-radius: 5; }
+                                                    """)
 
     def reloadWhereToLookCombobox(self, path):
         self.whereToLookComboBox.clear()
-        def listItemt(whereToLookComboBox, path):
-            whereToLookComboBox.addItem(path)
+        def listItem(whereToLookComboBox, path):
+            if os.path.isdir(path):
+                whereToLookComboBox.addItem(path)
             path_ = os.path.dirname(path)
             if path_ != path:
-                listItemt(whereToLookComboBox, path_)
+                listItem(whereToLookComboBox, path_)
 
-        listItemt(self.whereToLookComboBox, path)
+        listItem(self.whereToLookComboBox, path)
         for letter in string.ascii_uppercase:
             if ((path == "") or (letter != path[0])) and (os.path.exists(f"{letter}:/")):
                 self.whereToLookComboBox.addItem(f"{letter}:/")
-        
-    
+
     def onAddQuickAccess(self):
         self.signals.signal_add_quick_access.emit(self.whereToLookComboBox.currentText())
 
@@ -131,20 +167,22 @@ class NameTypeFilterWidget(QWidget):
         self.nameLineEdit.setText("")
         self.nameLineEdit.setFont(self.font.fonts["12"])
         self.nameLineEdit.setAlignment(Qt.AlignLeft)
+        self.nameLineEdit.setReadOnly(True)
         self.nameLineEdit.setStyleSheet("background-color: white; color: #075e6f; border: transparent; padding: 10;")
         self.nameLineEdit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         self.nameTypeFilterLayout.addWidget(self.nameLineEdit, 0, 1, 1, 1)
-        self.signals.signal_set_name_line_edit.connect(lambda val: self.nameLineEdit.setText(os.path.basename(val)))
+        self.signals.signal_set_name_line_edit.connect(self.onUpdateName)
         # 1, 1
         self.nameTypeFilterComboBox = QComboBox(self.nameTypeFilterWidget)
         self.nameTypeFilterComboBox.setFont(self.font.fonts["12"])
         self.nameTypeFilterComboBox.setStyleSheet("""QComboBox{ background-color: white; padding-left: 15px }
-                                            QComboBox:QAbstractItemView{ background-color: white; color:orange; padding-left: 15px }""")
+                                            QComboBox:QAbstractItemView{ background-c
+                                            olor: white; color:orange; padding-left: 15px }""")
         self.nameTypeFilterComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         self.reloadCombobox(self.nameTypeFilterComboBox, ["Image (*.PNG, *.JPG)", "Drawing eXchange Format - CAD (*.DXF)"])
         self.sizePolicy.setHeightForWidth(self.nameTypeFilterComboBox.sizePolicy().hasHeightForWidth())
         self.nameTypeFilterLayout.addWidget(self.nameTypeFilterComboBox, 1, 1, 1, 1)
-        self.nameTypeFilterComboBox.activated[str].connect(self.onnameTypeFilterActivated)
+        self.nameTypeFilterComboBox.activated[str].connect(self.onNameTypeFilterActivated)
         # 0, 2
         self.nameTypeFilterLayout.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Expanding))
         # 0, 3
@@ -179,11 +217,18 @@ class NameTypeFilterWidget(QWidget):
         for item in listValues:
             comboBox.addItem(item)
 
-    def onnameTypeFilterActivated(self, text):
+    def onNameTypeFilterActivated(self, text):
         self.signals.signal_update_type_filter.emit(text)
         
     def onOpenButton(self):
         self.signals.signal_send_open_path.emit(self.nameLineEdit.text().replace("\\", "/"))
+
+    def onUpdateName(self, path):
+        if os.path.isfile(path):
+            self.nameLineEdit.setText(os.path.basename(path))
+        else:
+            self.nameLineEdit.setText("")
+        
 
 class TreeViewFileSystemWidgetSignal(QObject):
     signal_send_clicked_path = pyqtSignal(str)
@@ -193,6 +238,7 @@ class TreeViewFileSystemWidget(QWidget):
         super(TreeViewFileSystemWidget, self).__init__()
         self.desktop_w = desktop_w
         self.desktop_h = desktop_h
+        self.extensions = ["*.PNG", "*.JPG"]
         # Policy
         self.sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.sizePolicy.setHorizontalStretch(0)
@@ -224,24 +270,37 @@ class TreeViewFileSystemWidget(QWidget):
         self.treeViewFileSystemLayout.setRowStretch(0, 1)
         self.treeViewFileSystemLayout.setColumnStretch(0, 1)
         self.treeViewFileSystemWidget.setLayout(self.treeViewFileSystemLayout)
+        self.setFileFilter()
 
     def onTreeViewClicked(self, index: QModelIndex):
         path = self.model.filePath(index)
-        # if os.path.isfile(path):
-        if True:
-            self.signals.signal_send_clicked_path.emit(path)
+        self.signals.signal_send_clicked_path.emit(path)
 
     def setRootPath(self, path):
+        dir_path = path
         if os.path.isfile(path):
-            path = os.path.dirname(path)
+            dir_path = os.path.dirname(path)
 
-        self.model.setRootPath(path)
+        self.model.setRootPath(dir_path)
         self.treeView.setModel(self.model)
-        self.treeView.setRootIndex(self.model.index(path))
+        self.treeView.setRootIndex(self.model.index(dir_path))
+        self.setCurrentIndex(path)
         # Collapse all expanded items
         self.treeView.collapseAll()
+        self.treeView.setSortingEnabled(True)
+        self.treeView.sortByColumn(0, Qt.AscendingOrder)
 
     def getCurrentIndex(self):
         current_index = self.treeView.currentIndex()
         current_path = self.model.filePath(current_index)
         return current_path
+
+    def setFileFilter(self, extensions=None):
+        # Set name filters
+        self.extensions = self.extensions if extensions is None else re.findall(r'(\*\.[\*\w]+)', extensions)
+        self.model.setNameFilters(self.extensions)
+        self.model.setNameFilterDisables(False)
+
+    def setCurrentIndex(self, path):
+        if os.path.exists(path) and os.path.isfile(path):
+            self.treeView.setCurrentIndex(self.model.index(path))

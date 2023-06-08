@@ -1,5 +1,1 @@
-E:/Downloads
-F:/Microsoft
-D:/Ami Fat Cat
-D:/Wallpaper 4th
-D:/Wallpaper 3rd
+E:/Projects/Veriserve_VN/file-explorer-preview

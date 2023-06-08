@@ -2,7 +2,7 @@ import os
 import re
 from PyQt5.QtCore import Qt, QObject, pyqtSignal
 from PyQt5.QtWidgets import  QVBoxLayout, QHBoxLayout, QLabel, QSpacerItem, QComboBox, QSizePolicy, QWidget, QPushButton, QGridLayout, QCheckBox, QLineEdit
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QColor, QPalette, QPainter
 from glob import glob
 
 class FavouriteLinkWidgetSignal(QObject):
@@ -90,14 +90,14 @@ class VisualPreviewWidget(QWidget):
         self.leftTriangleButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.leftTriangleButton.setFont(self.font.fonts["14"])
         self.leftTriangleButton.setStyleSheet("""QPushButton{ background-color: #068170; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }
-                                    QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }
-                                    QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }""")
+                                                 QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }
+                                                 QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }""")
         self.leftTriangleButton.clicked.connect(self.prev)
         self.visualPreviewWLayout.addWidget(self.leftTriangleButton, 2)
         # 1
         self.visualPreviewPixmap = QLabel(self.visualPreviewWidget)
-        self.visualPreviewPixmap.setStyleSheet("background-color: black; color: #075e6f; border: transparent; padding: 10;")
-        self.visualPreviewPixmap.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.visualPreviewPixmap.setStyleSheet("background-color: black; color: #075e6f; border: transparent; padding: 0;")
+        self.visualPreviewPixmap.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.visualPreviewPixmap.setScaledContents(True)
         self.visualPreviewPixmap.setAlignment(Qt.AlignCenter)
         self.visualPreviewPixmap.setFixedSize(int(destop_w / 3.975), int(destop_h / 2.175))
@@ -108,8 +108,8 @@ class VisualPreviewWidget(QWidget):
         self.rightTriangleButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.rightTriangleButton.setFont(self.font.fonts["14"])
         self.rightTriangleButton.setStyleSheet("""QPushButton{ background-color: #068170; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }
-                                    QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }
-                                    QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }""")
+                                                  QPushButton::pressed{ background-color: #088170; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }
+                                                  QPushButton::hover{ background-color: #229586; color: #ffffff; border: transparent; padding: 5; border-radius: 2; }""")
         self.rightTriangleButton.clicked.connect(self.next)
         self.visualPreviewWLayout.addWidget(self.rightTriangleButton, 2)
         # 3
@@ -163,17 +163,54 @@ class VisualPreviewWidget(QWidget):
         self.current = 0
         self.resetPreview()
 
-    def showPreview(self):
+    def showPreview(self, path=None):
+        if path is not None:
+            try:
+                self.current = self.listFiles.index(path)
+            except ValueError as e:
+                print(e)
+                return False
+
         if (self.current >= 0) and (self.current < len(self.listFiles)) and os.path.exists(self.listFiles[self.current]):
+            # pixmap = QPixmap(self.listFiles[self.current])
+            # print(self.visualPreviewPixmap.size())
+            # # pixmap = pixmap.scaled(self.visualPreviewPixmap.size(), Qt.KeepAspectRatio)
+            # pixmap = pixmap.scaled(self.visualPreviewPixmap.size(), aspectRatioMode=Qt.KeepAspectRatio, transformMode=Qt.SmoothTransformation)
+            # self.visualPreviewPixmap.setPixmap(pixmap)
+            # # Add a border to the QLabel using stylesheet
+            # border_color = QColor(0, 0, 0)  # Define the border color
+            # border_size = 5  # Define the border size
+            # self.visualPreviewPixmap.setStyleSheet(f"border: {border_size}px solid {border_color.name()};")
+
+            # # Set the background color of the QLabel to match the border color
+            # palette = QPalette()
+            # palette.setColor(QPalette.Background, border_color)
+            # self.visualPreviewPixmap.setAutoFillBackground(True)
+            # self.visualPreviewPixmap.setPalette(palette)
             pixmap = QPixmap(self.listFiles[self.current])
-            pixmap = pixmap.scaled(self.visualPreviewPixmap.size(), Qt.KeepAspectRatio)
-            self.visualPreviewPixmap.setPixmap(pixmap)
-            # self.visualPreviewPixmap.show()
-            self.signals.signal_send_current_image.emit(self.listFiles[self.current])
+            scaled_pixmap = pixmap.scaled(self.visualPreviewPixmap.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            
+            # Calculate the required offset to center the image within the QLabel
+            offset_x = (self.visualPreviewPixmap.width() - scaled_pixmap.width()) // 2
+            offset_y = (self.visualPreviewPixmap.height() - scaled_pixmap.height()) // 2
+
+            # Create a new QPixmap with the calculated offsets and set it to the QLabel
+            final_pixmap = QPixmap(self.visualPreviewPixmap.size())
+            final_pixmap.fill(Qt.transparent)
+            painter = QPainter(final_pixmap)
+            painter.drawPixmap(offset_x, offset_y, scaled_pixmap)
+            painter.end()
+
+            self.visualPreviewPixmap.setPixmap(final_pixmap)
+            if path is None:
+                self.signals.signal_send_current_image.emit(self.listFiles[self.current])
+
             return True
         else:
             self.visualPreviewPixmap.setPixmap(QPixmap())
-            self.signals.signal_send_current_image.emit("")
+            if path is None:
+                self.signals.signal_send_current_image.emit("")
+
             return False
 
     def updateListFiles(self, path, extensions=None):
@@ -188,8 +225,12 @@ class VisualPreviewWidget(QWidget):
                 self.current = self.listFiles.index(path.replace("\\", "/"))
             except ValueError:
                 self.current = 0
+            
+            if (self.current >= 0) and (self.current < len(self.listFiles)):
+                self.showPreview(self.listFiles[self.current])
+                return self.listFiles[self.current]
 
-            self.showPreview()
+        return ""
 
     def next(self):
         if (self.current + 1 < len(self.listFiles)):
@@ -282,7 +323,7 @@ class ShowLenghtValuesWidget(QWidget):
         self.lenght1ComboBox.setFont(self.font.fonts["12B"])
         self.lenght1ComboBox.setStyleSheet("""QComboBox{ background-color: white; padding-left: 15px }
                                             QComboBox:QAbstractItemView{ background-color: white; color:orange; padding-left: 15px }""")
-        self.lenght1ComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        self.lenght1ComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.reloadCombobox(self.lenght1ComboBox, ["#"])
         self.sizePolicy.setHeightForWidth(self.lenght1ComboBox.sizePolicy().hasHeightForWidth())
         self.howLenghtValuesLayout.addWidget(self.lenght1ComboBox, 0, 1, 1, 1)
@@ -291,7 +332,7 @@ class ShowLenghtValuesWidget(QWidget):
         self.lenght2ComboBox.setFont(self.font.fonts["12B"])
         self.lenght2ComboBox.setStyleSheet("""QComboBox{ background-color: white; padding-left: 15px }
                                             QComboBox:QAbstractItemView{ background-color: white; color:orange; padding-left: 15px }""")
-        self.lenght2ComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        self.lenght2ComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.reloadCombobox(self.lenght2ComboBox, ["#"])
         self.sizePolicy.setHeightForWidth(self.lenght2ComboBox.sizePolicy().hasHeightForWidth())
         self.howLenghtValuesLayout.addWidget(self.lenght2ComboBox, 1, 1, 1, 1)
@@ -300,7 +341,7 @@ class ShowLenghtValuesWidget(QWidget):
         self.lenght3ComboBox.setFont(self.font.fonts["12B"])
         self.lenght3ComboBox.setStyleSheet("""QComboBox{ background-color: white; padding-left: 15px }
                                             QComboBox:QAbstractItemView{ background-color: white; color:orange; padding-left: 15px }""")
-        self.lenght3ComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        self.lenght3ComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.reloadCombobox(self.lenght3ComboBox, ["#"])
         self.sizePolicy.setHeightForWidth(self.lenght3ComboBox.sizePolicy().hasHeightForWidth())
         self.howLenghtValuesLayout.addWidget(self.lenght3ComboBox, 2, 1, 1, 1)
@@ -309,7 +350,7 @@ class ShowLenghtValuesWidget(QWidget):
         self.lenght4ComboBox.setFont(self.font.fonts["12B"])
         self.lenght4ComboBox.setStyleSheet("""QComboBox{ background-color: white; padding-left: 15px }
                                             QComboBox:QAbstractItemView{ background-color: white; color:orange; padding-left: 15px }""")
-        self.lenght4ComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        self.lenght4ComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.reloadCombobox(self.lenght4ComboBox, ["#"])
         self.sizePolicy.setHeightForWidth(self.lenght4ComboBox.sizePolicy().hasHeightForWidth())
         self.howLenghtValuesLayout.addWidget(self.lenght4ComboBox, 3, 1, 1, 1)
@@ -389,7 +430,7 @@ class ShowLenghtValuesWidget(QWidget):
         self.designDateComboBox.setFont(self.font.fonts["12"])
         self.designDateComboBox.setStyleSheet("""QComboBox{ background-color: white; padding-left: 15px }
                                             QComboBox:QAbstractItemView{ background-color: white; color:orange; padding-left: 15px }""")
-        self.designDateComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        self.designDateComboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.reloadCombobox(self.designDateComboBox, ["0"])
         self.sizePolicy.setHeightForWidth(self.designDateComboBox.sizePolicy().hasHeightForWidth())
         self.howLenghtValuesLayout.addWidget(self.designDateComboBox, 4, 4, 1, 1)
@@ -459,3 +500,4 @@ class ShowLenghtValuesWidget(QWidget):
             self.totalLengthLineEdit.setText(str(lenght1 + lenght2 + lenght3 + lenght4))
         except ValueError as e:
             self.totalLengthLineEdit.setText("0")
+

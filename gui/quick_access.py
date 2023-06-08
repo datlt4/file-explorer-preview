@@ -55,7 +55,7 @@ class QuickAccessItem(QListWidgetItem):
         self.menu.setFont(self.font.fonts["10"])
         self.removeAction = QAction("Remove", self.widget)
         self.removeAction.triggered.connect(self.onRemoveAction)
-        self.menu.addAction(self.removeAction)
+        # self.menu.addAction(self.removeAction)
         # Connect the context menu event handler function to the customContextMenuRequested signal
         self.widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.widget.customContextMenuRequested.connect(self.showContextMenu)

@@ -39,7 +39,11 @@ class AppWindow(QMainWindow):
         self.initSignalConnection()
         self.closeEvent = self._closeEvent
         self.onClickedFile(os.getcwd().replace("\\", "/"))
-    
+        if os.path.isfile(os.getcwd().replace("\\", "/")):
+            self.whereToLookControlWidget.styleAddQuickAccessButton("Remove" if os.path.dirname(os.getcwd().replace("\\", "/")) in self.quickAccessAddresses else "Add")
+        else:
+            self.whereToLookControlWidget.styleAddQuickAccessButton("Remove" if os.getcwd().replace("\\", "/") in self.quickAccessAddresses else "Add")
+
     def initUI(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.l, self.t, self.w, self.h)
@@ -124,7 +128,7 @@ class AppWindow(QMainWindow):
 
     def initSignalConnection(self):
         # Signals connections
-        self.listAllFileDirWidget.signals.signal_send_clicked_path.connect(self.onClickedFile)
+        self.listAllFileDirWidget.signals.signal_send_clicked_path.connect(self.onSendCurrentImage)
         self.nameTypeFilterWidget.signals.signal_close_application.connect(lambda: QCoreApplication.exit(0))
         self.nameTypeFilterWidget.signals.signal_update_type_filter.connect(self.onUpdateExtensionFilter)
         self.visualPreviewWidget.signals.signal_send_current_image.connect(self.onSendCurrentImage)
@@ -140,11 +144,16 @@ class AppWindow(QMainWindow):
             self.selectedFile = path
             self.nameTypeFilterWidget.signals.signal_set_name_line_edit.emit(self.selectedFile)
             self.whereToLookControlWidget.reloadWhereToLookCombobox(self.selectedFile)
-            self.visualPreviewWidget.updateListFiles(self.selectedFile)
+            path0 = self.visualPreviewWidget.updateListFiles(self.selectedFile)
+            self.listAllFileDirWidget.setCurrentIndex(path0)
+            self.nameTypeFilterWidget.signals.signal_set_name_line_edit.emit(path0)
             self.listAllFileDirWidget.setRootPath(path)
 
     def onUpdateExtensionFilter(self, filter):
-        self.visualPreviewWidget.updateListFiles(self.selectedFile, filter)
+        path0 = self.visualPreviewWidget.updateListFiles(self.selectedFile, filter)
+        self.listAllFileDirWidget.setCurrentIndex(path0)
+        self.nameTypeFilterWidget.signals.signal_set_name_line_edit.emit(path0)
+        self.listAllFileDirWidget.setFileFilter(filter)
 
     def onSendCurrentImage(self, path):
         if path != "":
@@ -152,19 +161,38 @@ class AppWindow(QMainWindow):
                 self.onClickedFile(path)
             else:
                 self.selectedFile = path
+                self.visualPreviewWidget.showPreview(self.selectedFile)
                 self.nameTypeFilterWidget.signals.signal_set_name_line_edit.emit(self.selectedFile)
                 self.whereToLookControlWidget.reloadWhereToLookCombobox(self.selectedFile)
                 self.listAllFileDirWidget.setRootPath(path)
-            
+
+            if os.path.isfile(path):
+                self.whereToLookControlWidget.styleAddQuickAccessButton("Remove" if os.path.dirname(path) in self.quickAccessAddresses else "Add")
+            else:
+                self.whereToLookControlWidget.styleAddQuickAccessButton("Remove" if path in self.quickAccessAddresses else "Add")
 
     def onAddNewQuickAccess(self, text):
-        path = text if (os.path.isdir(text)) else os.path.dirname(text)
-        self.quickAccessAddresses.append(path)
-        m_db.write_db(self.quickAccessAddresses)
-        self.quickAccessWidget.reload(self.quickAccessAddresses)
+        if text in self.quickAccessAddresses:
+            self.onRemoveQuickAccess(text)
+            self.whereToLookControlWidget.styleAddQuickAccessButton("Add")
+        else:
+            path = text if (os.path.isdir(text)) else os.path.dirname(text)
+            self.quickAccessAddresses.append(path)
+            m_db.write_db(self.quickAccessAddresses)
+            self.quickAccessWidget.reload(self.quickAccessAddresses)
+            self.whereToLookControlWidget.styleAddQuickAccessButton("Remove")
         
     def onRemoveQuickAccess(self, item):
-        idx, address = item
+        if isinstance(item, list):
+            idx, address = item
+        else:
+            address = item
+            try:
+                idx = self.quickAccessAddresses.index(item)
+            except ValueError as e:
+                print(e)
+                return
+
         if (idx >= 0) and (idx < len(self.quickAccessAddresses)):
             if self.quickAccessAddresses[idx] == address:
                 self.quickAccessAddresses.pop(idx)
